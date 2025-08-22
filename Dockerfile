@@ -46,8 +46,9 @@ RUN php artisan storage:link
 ENV APP_URL=https://boostme-backend-production.up.railway.app
 ENV ASSET_URL=https://boostme-backend-production.up.railway.app
 
-# Run migrations and start server
+# Run migrations and create admin user if not exists
 CMD php artisan migrate --force && \
+    php artisan tinker --execute="if(!\\App\\Models\\User::where('email', 'admin@boostme.com')->exists()) { \\App\\Models\\User::create(['id' => Str::uuid(), 'email' => 'admin@boostme.com', 'password_hash' => Hash::make('Admin123!'), 'full_name' => 'Admin', 'role' => 'admin', 'email_verified' => true]); }" && \
     php artisan config:clear && \
     php artisan config:cache && \
     php artisan route:cache && \
