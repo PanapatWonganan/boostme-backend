@@ -51,5 +51,8 @@ RUN chown -R www-data:www-data /app
 # Expose port
 EXPOSE 8000
 
+# Run migrations during build
+RUN php artisan migrate --force || true
+
 # Start server
-CMD php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=${PORT}
+CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
