@@ -1,58 +1,44 @@
-FROM php:8.2-cli
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    libicu-dev \
-    zip \
-    unzip \
-    nodejs \
-    npm \
-    default-mysql-client
-
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip intl
-
-# Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+FROM webdevops/php-nginx:8.2-alpine
 
 # Set working directory
 WORKDIR /app
 
-# Copy existing application directory contents
+# Install additional PHP extensions if needed
+RUN apk add --no-cache mysql-client nodejs npm
+
+# Copy application
 COPY . /app
 
-# Create basic .env for build process
+# Set permissions
+RUN chown -R application:application /app
+
+# Create .env file
 RUN cp .env.example .env
 
-# Install dependencies (ignore platform reqs and update if needed)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs || composer update --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+# Install composer dependencies
+RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
-# Generate key 
+# Generate key
 RUN php artisan key:generate
 
-# Install and build frontend assets
+# Install and build frontend
 RUN npm install && npm run build
 
 # Create storage link
 RUN php artisan storage:link
 
-# Change ownership of our applications
-RUN chown -R www-data:www-data /app
+# Set correct permissions for Laravel
+RUN chown -R application:application /app/storage /app/bootstrap/cache
+RUN chmod -R 775 /app/storage /app/bootstrap/cache
 
-# Expose port (Railway typically uses 8080)
-EXPOSE 8080
+# Configure nginx
+ENV WEB_DOCUMENT_ROOT=/app/public
+ENV PHP_MEMORY_LIMIT=512M
+ENV PHP_MAX_EXECUTION_TIME=60
+ENV PHP_POST_MAX_SIZE=50M
+ENV PHP_UPLOAD_MAX_FILESIZE=50M
 
-# Run migrations during build
-RUN php artisan migrate --force || true
+# Expose port
+EXPOSE 80
 
-# Start server - Railway will set PORT env var
-CMD ["sh", "-c", "echo 'Starting Laravel on port:' ${PORT:-8080} && php artisan serve --host=0.0.0.0 --port=${PORT:-8080}"]
+# The base image already has proper entrypoint for nginx+php-fpm
