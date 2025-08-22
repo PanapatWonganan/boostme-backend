@@ -48,11 +48,11 @@ RUN php artisan storage:link
 # Change ownership of our applications
 RUN chown -R www-data:www-data /app
 
-# Expose port
-EXPOSE 8000
+# Expose port (Railway typically uses 8080)
+EXPOSE 8080
 
 # Run migrations during build
 RUN php artisan migrate --force || true
 
-# Start server
-CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+# Start server - Railway will set PORT env var
+CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8080}"]
