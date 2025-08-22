@@ -33,11 +33,11 @@ COPY . /app
 # Create basic .env for build process
 RUN cp .env.example .env
 
-# Install dependencies first (without running scripts that need artisan)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+# Install dependencies (ignore platform reqs and update if needed)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs || composer update --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
-# Generate key and run post-install scripts
-RUN php artisan key:generate && composer run-script post-autoload-dump
+# Generate key 
+RUN php artisan key:generate
 
 # Install and build frontend assets
 RUN npm install && npm run build
