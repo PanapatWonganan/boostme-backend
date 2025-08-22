@@ -1,44 +1,49 @@
-FROM webdevops/php-nginx:8.2-alpine
+FROM php:8.2-cli
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    libicu-dev \
+    zip \
+    unzip \
+    nodejs \
+    npm
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip intl
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Set working directory
 WORKDIR /app
 
-# Install additional PHP extensions if needed
-RUN apk add --no-cache mysql-client nodejs npm
-
 # Copy application
 COPY . /app
 
-# Set permissions
-RUN chown -R application:application /app
+# Create .env and set permissions
+RUN cp .env.example .env && \
+    chmod -R 777 storage bootstrap/cache
 
-# Create .env file
-RUN cp .env.example .env
-
-# Install composer dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Generate key
 RUN php artisan key:generate
 
-# Install and build frontend
+# Install frontend dependencies and build
 RUN npm install && npm run build
 
 # Create storage link
 RUN php artisan storage:link
 
-# Set correct permissions for Laravel
-RUN chown -R application:application /app/storage /app/bootstrap/cache
-RUN chmod -R 775 /app/storage /app/bootstrap/cache
-
-# Configure nginx
-ENV WEB_DOCUMENT_ROOT=/app/public
-ENV PHP_MEMORY_LIMIT=512M
-ENV PHP_MAX_EXECUTION_TIME=60
-ENV PHP_POST_MAX_SIZE=50M
-ENV PHP_UPLOAD_MAX_FILESIZE=50M
-
-# Expose port
-EXPOSE 80
-
-# The base image already has proper entrypoint for nginx+php-fpm
+# Run migrations and start server
+CMD php artisan migrate --force && \
+    php artisan config:cache && \
+    php artisan route:cache && \
+    php artisan serve --host=0.0.0.0 --port=$PORT
