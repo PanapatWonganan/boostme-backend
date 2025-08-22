@@ -55,4 +55,4 @@ EXPOSE 8080
 RUN php artisan migrate --force || true
 
 # Start server - Railway will set PORT env var
-CMD ["sh", "-c", "php artisan serve --host=0.0.0.0 --port=${PORT:-8080}"]
+CMD ["sh", "-c", "echo 'Starting Laravel on port:' ${PORT:-8080} && php artisan serve --host=0.0.0.0 --port=${PORT:-8080}"]
