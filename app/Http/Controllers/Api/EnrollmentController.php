@@ -43,7 +43,8 @@ class EnrollmentController extends Controller
             $userId = $parts[0];
 
             // Get all courses (simulate enrollment - everyone enrolled in all courses)
-            $courses = Course::select('id', 'title', 'description', 'instructor', 'price', 'level')
+            $courses = Course::with('instructor:id,name')
+                ->select('id', 'title', 'description', 'instructor_id', 'price', 'level')
                 ->take(10)
                 ->get()
                 ->map(function ($course) use ($userId) {
@@ -64,7 +65,7 @@ class EnrollmentController extends Controller
                         'id' => $course->id,
                         'title' => $course->title,
                         'description' => $course->description,
-                        'instructor' => $course->instructor,
+                        'instructor' => $course->instructor ? $course->instructor->name : 'Unknown',
                         'level' => $course->level,
                         'progress' => $progress,
                         'total_lessons' => $totalLessons,
