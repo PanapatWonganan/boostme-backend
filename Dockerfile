@@ -28,6 +28,9 @@ WORKDIR /app
 # Copy existing application directory contents
 COPY . /app
 
+# Create basic .env for build process
+RUN cp .env.example .env && php artisan key:generate
+
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
