@@ -30,8 +30,8 @@ COPY . /app
 RUN cp .env.example .env && \
     chmod -R 777 storage bootstrap/cache
 
-# Install dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# Install dependencies with platform check bypass
+RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
 # Generate key
 RUN php artisan key:generate
