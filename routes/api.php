@@ -32,72 +32,11 @@ Route::get('/user', function (Request $request) {
 
 // Authentication routes (public)
 Route::prefix('v1/auth')->group(function () {
-    Route::post('/login', function(Request $request) {
-        $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required'
-        ]);
+    Route::post('/login', [App\Http\Controllers\Api\AuthController::class, 'login']);
 
-        // For demo purposes, accept specific test credentials
-        if ($credentials['email'] === 'admin@boostme.com' && $credentials['password'] === 'password123') {
-            return response()->json([
-                'success' => true,
-                'user' => [
-                    'id' => '1',
-                    'email' => 'admin@boostme.com',
-                    'fullName' => 'BoostMe Admin',
-                    'role' => 'admin',
-                    'avatarUrl' => null,
-                    'emailVerified' => true,
-                    'phone' => '02-123-4567',
-                    'createdAt' => now()->toISOString()
-                ],
-                'token' => 'demo-token-' . time()
-            ]);
-        }
-        
-        if ($credentials['email'] === 'user@boostme.com' && $credentials['password'] === 'password123') {
-            return response()->json([
-                'success' => true,
-                'user' => [
-                    'id' => '2',
-                    'email' => 'user@boostme.com',
-                    'fullName' => 'ลูกค้า BoostMe',
-                    'role' => 'student',
-                    'avatarUrl' => null,
-                    'emailVerified' => true,
-                    'phone' => '08-888-9999',
-                    'createdAt' => now()->toISOString()
-                ],
-                'token' => 'demo-token-' . time()
-            ]);
-        }
-
-        return response()->json([
-            'success' => false,
-            'error' => 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-        ], 401);
-    });
-
-    Route::post('/logout', function() {
-        return response()->json(['success' => true, 'message' => 'ออกจากระบบสำเร็จ']);
-    });
-
-    Route::get('/me', function() {
-        // Return demo user for testing
-        return response()->json([
-            'user' => [
-                'id' => '1',
-                'email' => 'admin@boostme.com',
-                'fullName' => 'BoostMe Admin',
-                'role' => 'admin',
-                'avatarUrl' => null,
-                'emailVerified' => true,
-                'phone' => '02-123-4567',
-                'createdAt' => now()->toISOString()
-            ]
-        ]);
-    });
+    Route::post('/register', [App\Http\Controllers\Api\AuthController::class, 'register']);
+    Route::post('/logout', [App\Http\Controllers\Api\AuthController::class, 'logout']);
+    Route::get('/me', [App\Http\Controllers\Api\AuthController::class, 'profile']);
 });
 
 // Public API routes (no authentication required)
