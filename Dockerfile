@@ -42,8 +42,13 @@ RUN npm install && npm run build
 # Create storage link
 RUN php artisan storage:link
 
+# Force HTTPS in production
+ENV APP_URL=https://boostme-backend-production.up.railway.app
+ENV ASSET_URL=https://boostme-backend-production.up.railway.app
+
 # Run migrations and start server
 CMD php artisan migrate --force && \
+    php artisan config:clear && \
     php artisan config:cache && \
     php artisan route:cache && \
     php artisan serve --host=0.0.0.0 --port=$PORT
