@@ -29,10 +29,13 @@ WORKDIR /app
 COPY . /app
 
 # Create basic .env for build process
-RUN cp .env.example .env && php artisan key:generate
+RUN cp .env.example .env
 
-# Install dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# Install dependencies first (without running scripts that need artisan)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
+# Generate key and run post-install scripts
+RUN php artisan key:generate && composer run-script post-autoload-dump
 
 # Install and build frontend assets
 RUN npm install && npm run build
