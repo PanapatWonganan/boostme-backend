@@ -251,7 +251,7 @@ class ProgressController extends Controller
             $userId = $parts[0];
 
             // Check if course exists
-            $course = Course::with('instructor:id,name')->find($courseId);
+            $course = Course::with('instructor:id,full_name')->find($courseId);
             if (!$course) {
                 return response()->json([
                     'success' => false,
@@ -294,7 +294,7 @@ class ProgressController extends Controller
                     'id' => $course->id,
                     'title' => $course->title,
                     'description' => $course->description,
-                    'instructor' => $course->instructor ? $course->instructor->name : 'Unknown',
+                    'instructor' => $course->instructor ? $course->instructor->full_name : 'Unknown',
                     'level' => $course->level
                 ],
                 'progress' => [
