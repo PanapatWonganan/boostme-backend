@@ -19,13 +19,50 @@ use Illuminate\Validation\Rule;
 class GardenController extends Controller
 {
     /**
+     * Get authenticated user from token
+     */
+    private function getAuthenticatedUser(Request $request)
+    {
+        $token = $request->header('Authorization');
+        if (!$token) {
+            return null;
+        }
+
+        // Remove "Bearer " prefix if present
+        $token = str_replace('Bearer ', '', $token);
+        
+        // Decode token
+        $decoded = base64_decode($token);
+        $parts = explode('|', $decoded);
+        
+        if (count($parts) !== 2) {
+            return null;
+        }
+
+        $userId = $parts[0];
+        return User::find($userId);
+    }
+
+    /**
+     * Return auth error response
+     */
+    private function authError($message = 'Authentication required')
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message
+        ], 401);
+    }
+    /**
      * Get user's garden information
      */
     public function index(Request $request): JsonResponse
     {
         try {
-            // For testing - use demo user if no auth
-            $user = $request->user() ?? User::first();
+            $user = $this->getAuthenticatedUser($request);
+            if (!$user) {
+                return $this->authError();
+            }
             
             // สร้างสวนใหม่ถ้ายังไม่มี
             $garden = $user->getOrCreateGarden();
@@ -119,7 +156,10 @@ class GardenController extends Controller
     {
         try {
             // For testing - use demo user if no auth
-            $user = $request->user() ?? User::first();
+            $user = $this->getAuthenticatedUser($request);
+            if (!$user) {
+                return $this->authError();
+            }
             $garden = $user ? $user->getOrCreateGarden() : null;
 
             $plantTypes = PlantType::active()
@@ -169,7 +209,10 @@ class GardenController extends Controller
             ]);
 
             // For testing - use demo user if no auth
-            $user = $request->user() ?? User::first();
+            $user = $this->getAuthenticatedUser($request);
+            if (!$user) {
+                return $this->authError();
+            }
             $garden = $user->getOrCreateGarden();
 
             // ตรวจสอบ PlantType
@@ -288,7 +331,10 @@ class GardenController extends Controller
     {
         try {
             // For testing - use demo user if no auth
-            $user = $request->user() ?? User::first();
+            $user = $this->getAuthenticatedUser($request);
+            if (!$user) {
+                return $this->authError();
+            }
             $plant = UserPlant::where('user_id', $user->id)->find($userPlantId);
 
             if (!$plant) {
@@ -363,7 +409,10 @@ class GardenController extends Controller
     {
         try {
             // For testing - use demo user if no auth
-            $user = $request->user() ?? User::first();
+            $user = $this->getAuthenticatedUser($request);
+            if (!$user) {
+                return $this->authError();
+            }
             $plant = UserPlant::where('user_id', $user->id)->find($userPlantId);
 
             if (!$plant) {
@@ -430,7 +479,10 @@ class GardenController extends Controller
     {
         try {
             // For testing - use demo user if no auth
-            $user = $request->user() ?? User::first();
+            $user = $this->getAuthenticatedUser($request);
+            if (!$user) {
+                return $this->authError();
+            }
             $garden = $user->getOrCreateGarden();
 
             if (!$garden->needsWatering()) {
