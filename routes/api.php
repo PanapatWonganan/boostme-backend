@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\GardenThemeController;
 use App\Http\Controllers\Api\CommunityGardenController;
 use App\Http\Controllers\Api\AdvancedPlantController;
 use App\Http\Controllers\Api\SeasonalEventController;
+use App\Http\Controllers\Api\EnrollmentController;
+use App\Http\Controllers\Api\ProgressController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -54,6 +56,15 @@ Route::prefix('v1')->group(function () {
     Route::get('/courses/{courseId}/lessons', [LessonController::class, 'getCourseLessons']);
     Route::get('/lessons/{lessonId}', [LessonController::class, 'show']);
     Route::get('/lessons/{lessonId}/stream-url', [LessonController::class, 'getStreamUrl']);
+    
+    // Enrollment routes
+    Route::get('/enrollments/my', [EnrollmentController::class, 'getMyEnrollments']);
+    Route::post('/enrollments', [EnrollmentController::class, 'enrollInCourse']);
+    
+    // Progress tracking routes
+    Route::get('/progress/my-summary', [ProgressController::class, 'getMySummary']);
+    Route::put('/progress/lessons/{lessonId}', [ProgressController::class, 'updateLessonProgress']);
+    Route::get('/progress/courses/{courseId}', [ProgressController::class, 'getCourseProgress']);
     
     // Health check endpoint
     Route::get('/health', function () {
