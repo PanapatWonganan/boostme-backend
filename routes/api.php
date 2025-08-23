@@ -59,6 +59,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/list-lessons', [SystemDebugController::class, 'listLessons']);
         Route::post('/force-create-video/{lessonId}', [SystemDebugController::class, 'forceCreateVideo']);
         Route::get('/force-create-video/{lessonId}', [SystemDebugController::class, 'forceCreateVideo']);
+        Route::get('/delete-broken-videos', [SystemDebugController::class, 'deleteBrokenVideos']);
     });
     
     // User management routes

@@ -353,6 +353,66 @@ class SystemDebugController extends Controller
         }
     }
     
+    public function deleteBrokenVideos()
+    {
+        try {
+            $videos = \App\Models\Video::all();
+            $deletedCount = 0;
+            
+            foreach ($videos as $video) {
+                // Check if video file exists
+                $pathExists = false;
+                
+                $pathsToCheck = [];
+                if ($video->hls_path) {
+                    $pathsToCheck[] = $video->hls_path;
+                }
+                if ($video->original_path) {
+                    $pathsToCheck[] = $video->original_path;
+                }
+                
+                foreach ($pathsToCheck as $videoPath) {
+                    $possiblePaths = [
+                        storage_path('app/' . ltrim($videoPath, '/')),
+                        storage_path('app/private/' . ltrim($videoPath, '/')),
+                        '/app/storage/app/' . ltrim($videoPath, '/'),
+                        '/app/storage/app/private/' . ltrim($videoPath, '/'),
+                    ];
+                    
+                    foreach ($possiblePaths as $path) {
+                        if (file_exists($path)) {
+                            $pathExists = true;
+                            break 2;
+                        }
+                    }
+                }
+                
+                if (!$pathExists) {
+                    // Delete video record since file doesn't exist
+                    try {
+                        $video->accessLogs()->delete();
+                        $video->delete();
+                        $deletedCount++;
+                    } catch (\Exception $e) {
+                        // Continue if deletion fails
+                    }
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'deleted_count' => $deletedCount,
+                'message' => "Deleted {$deletedCount} video records without actual files"
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
     public function listVideos()
     {
         try {
