@@ -15,8 +15,10 @@ class ForceHttps
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Only force HTTPS in production
-        if (config('app.env') === 'production' && !$request->secure()) {
+        // Only force HTTPS in production - use environment variable directly
+        $isProduction = $_ENV['APP_ENV'] === 'production' || getenv('APP_ENV') === 'production';
+        
+        if ($isProduction && !$request->secure()) {
             return redirect()->secure($request->getRequestUri(), 301);
         }
 

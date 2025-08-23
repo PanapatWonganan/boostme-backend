@@ -20,12 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Trust proxies for Railway
         $middleware->trustProxies(at: '*');
         
-        // Apply ForceHttps to web routes in production
-        if (config('app.env') === 'production') {
-            $middleware->web(append: [
-                \App\Http\Middleware\ForceHttps::class,
-            ]);
-        }
+        // Apply ForceHttps to web routes - always in this environment
+        $middleware->web(append: [
+            \App\Http\Middleware\ForceHttps::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
