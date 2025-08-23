@@ -48,6 +48,83 @@ class ChallengeController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to get today\'s challenges',
+                'error' => $e->getMessage(),
+                'debug_info' => [
+                    'user_id' => $user?->id ?? 'no_user',
+                    'today_date' => today()->format('Y-m-d'),
+                    'total_daily_challenges' => DailyChallenge::count(),
+                    'today_challenges_raw' => DailyChallenge::today()->count()
+                ]
+            ], 500);
+        }
+    }
+
+    /**
+     * Create sample daily challenges for testing
+     */
+    public function createSampleChallenges(): JsonResponse
+    {
+        try {
+            $challenges = [
+                [
+                    'name' => '🚰 รดน้ำต้นไม้ในสวน',
+                    'description' => 'รดน้ำให้กับต้นไม้ในสวนของคุณ 1 ครั้ง',
+                    'challenge_type' => 'water_plants',
+                    'requirements' => json_encode(['count' => 1, 'type' => 'water']),
+                    'xp_reward' => 50,
+                    'star_seeds_reward' => 10,
+                    'available_date' => today(),
+                    'expires_at' => today()->endOfDay(),
+                    'is_active' => true
+                ],
+                [
+                    'name' => '🌱 ปลูกพืชใหม่',
+                    'description' => 'ปลูกต้นไม้ใหม่ในสวนของคุณ 1 ต้น',
+                    'challenge_type' => 'plant_seed',
+                    'requirements' => json_encode(['count' => 1, 'type' => 'plant']),
+                    'xp_reward' => 100,
+                    'star_seeds_reward' => 20,
+                    'available_date' => today(),
+                    'expires_at' => today()->endOfDay(),
+                    'is_active' => true
+                ],
+                [
+                    'name' => '📚 เรียนบทเรียนใหม่',
+                    'description' => 'ดูบทเรียนใหม่ในคอร์สเรียน 1 บทเรียน',
+                    'challenge_type' => 'complete_lesson',
+                    'requirements' => json_encode(['count' => 1, 'type' => 'lesson']),
+                    'xp_reward' => 75,
+                    'star_seeds_reward' => 15,
+                    'available_date' => today(),
+                    'expires_at' => today()->endOfDay(),
+                    'is_active' => true
+                ]
+            ];
+
+            $created = [];
+            foreach ($challenges as $challengeData) {
+                // Check if challenge already exists today
+                $existing = DailyChallenge::where('challenge_type', $challengeData['challenge_type'])
+                    ->where('available_date', today())
+                    ->first();
+                    
+                if (!$existing) {
+                    $challenge = DailyChallenge::create($challengeData);
+                    $created[] = $challenge;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sample challenges created',
+                'created_count' => count($created),
+                'total_challenges' => DailyChallenge::today()->count()
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create challenges',
                 'error' => $e->getMessage()
             ], 500);
         }
