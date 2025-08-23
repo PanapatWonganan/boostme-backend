@@ -140,7 +140,36 @@ class ProcessVideoJob implements ShouldQueue
         // Copy original file to video directory
         $originalFileName = basename($this->video->original_path);
         $newPath = $outputDir . '/' . $originalFileName;
-        Storage::disk('local')->copy($this->video->original_path, $newPath);
+        
+        // Ensure video directory exists first
+        if (!Storage::disk('local')->exists($outputDir)) {
+            Storage::disk('local')->makeDirectory($outputDir);
+        }
+        
+        if (Storage::disk('local')->exists($this->video->original_path)) {
+            $copyResult = Storage::disk('local')->copy($this->video->original_path, $newPath);
+            Log::info("Video copy result for {$this->video->id}: " . ($copyResult ? 'success' : 'failed'));
+            
+            if (!$copyResult) {
+                throw new \Exception("Failed to copy video file from {$this->video->original_path} to {$newPath}");
+            }
+        } else {
+            Log::warning("Original video file not found at: {$this->video->original_path}");
+            throw new \Exception("Original video file not found at: {$this->video->original_path}");
+        }
+        
+        // Verify the copied file exists and has content
+        $copiedPath = Storage::disk('local')->path($newPath);
+        if (!file_exists($copiedPath) || filesize($copiedPath) == 0) {
+            throw new \Exception("Copied video file is missing or empty: {$copiedPath}");
+        }
+        
+        Log::info("Video file successfully copied:", [
+            'video_id' => $this->video->id,
+            'from' => $this->video->original_path,
+            'to' => $newPath,
+            'size' => filesize($copiedPath)
+        ]);
         
         // Update video record
         $this->video->update([
@@ -150,7 +179,9 @@ class ProcessVideoJob implements ShouldQueue
             'metadata' => array_merge($this->video->metadata ?? [], [
                 'processed_at' => now()->toISOString(),
                 'processing_method' => 'direct_copy',
-                'ffmpeg_available' => false
+                'ffmpeg_available' => false,
+                'copied_file_size' => filesize($copiedPath),
+                'copied_file_path' => $copiedPath
             ])
         ]);
     }

@@ -176,6 +176,64 @@ class SystemDebugController extends Controller
         }
     }
     
+    public function downloadVideo(Request $request, $videoId)
+    {
+        try {
+            $video = \App\Models\Video::findOrFail($videoId);
+            
+            // Find the video file
+            $possiblePaths = [
+                storage_path('app/private/' . $video->original_path),
+                storage_path('app/' . $video->original_path),
+                Storage::disk('local')->path($video->original_path),
+                '/app/storage/app/private/' . $video->original_path,
+                '/app/storage/app/' . $video->original_path,
+                storage_path('app/private/' . $video->hls_path),
+                Storage::disk('local')->path($video->hls_path ?? '')
+            ];
+            
+            $path = null;
+            foreach ($possiblePaths as $testPath) {
+                if (file_exists($testPath)) {
+                    $path = $testPath;
+                    break;
+                }
+            }
+            
+            if (!$path || !file_exists($path)) {
+                return response()->json([
+                    'error' => 'Video file not found',
+                    'checked_paths' => $possiblePaths
+                ], 404);
+            }
+            
+            // Stream the file directly without token validation (debug only)
+            return response()->stream(
+                function () use ($path) {
+                    $stream = fopen($path, 'rb');
+                    while (!feof($stream)) {
+                        echo fread($stream, 8192);
+                        flush();
+                    }
+                    fclose($stream);
+                },
+                200,
+                [
+                    'Content-Type' => 'video/mp4',
+                    'Content-Length' => filesize($path),
+                    'Content-Disposition' => 'attachment; filename="debug_video.mp4"',
+                    'Access-Control-Allow-Origin' => '*',
+                ]
+            );
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
     public function testUpload(Request $request)
     {
         // Simple test upload without processing
