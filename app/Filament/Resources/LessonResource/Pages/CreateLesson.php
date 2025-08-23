@@ -15,9 +15,13 @@ class CreateLesson extends CreateRecord
     
     protected function afterCreate(): void
     {
+        \Log::info('CreateLesson afterCreate() called for lesson: ' . $this->record->id);
+        
         // Try to get video upload from form state
         $formState = $this->form->getState();
         $videoUpload = $formState['video_upload'] ?? null;
+        
+        \Log::info('Video upload data in afterCreate:', ['video_upload' => $videoUpload]);
         
         if ($videoUpload && !empty($videoUpload)) {
             try {
@@ -32,15 +36,19 @@ class CreateLesson extends CreateRecord
                         }
                     }
                     if ($filePath) {
+                        \Log::info('Processing video upload from array: ' . $filePath);
                         $this->processVideoUpload($filePath);
                     }
                 } elseif (is_string($videoUpload)) {
+                    \Log::info('Processing video upload from string: ' . $videoUpload);
                     $this->processVideoUpload($videoUpload);
                 }
             } catch (\Exception $e) {
                 \Log::error('Error processing video upload: ' . $e->getMessage());
                 $this->notify('danger', 'Error processing video upload: ' . $e->getMessage());
             }
+        } else {
+            \Log::info('No video upload found in form state');
         }
     }
     

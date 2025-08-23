@@ -467,4 +467,91 @@ class SystemDebugController extends Controller
             ], 500);
         }
     }
+
+    public function forceCreateVideo($lessonId)
+    {
+        try {
+            $lesson = \App\Models\Lesson::findOrFail($lessonId);
+            
+            // Check if video already exists
+            $existingVideo = $lesson->primaryVideo;
+            if ($existingVideo) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Video already exists for this lesson',
+                    'video_id' => $existingVideo->id,
+                    'video_status' => $existingVideo->status
+                ]);
+            }
+            
+            // Look for uploaded files in temp-videos directory
+            $tempDir = '/app/storage/app/private/temp-videos';
+            $files = [];
+            
+            if (is_dir($tempDir)) {
+                $allFiles = scandir($tempDir);
+                foreach ($allFiles as $file) {
+                    if ($file !== '.' && $file !== '..' && is_file($tempDir . '/' . $file)) {
+                        $files[] = [
+                            'name' => $file,
+                            'path' => 'temp-videos/' . $file,
+                            'full_path' => $tempDir . '/' . $file,
+                            'size' => filesize($tempDir . '/' . $file),
+                            'modified' => date('Y-m-d H:i:s', filemtime($tempDir . '/' . $file))
+                        ];
+                    }
+                }
+            }
+            
+            if (empty($files)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No video files found in temp directory',
+                    'temp_dir' => $tempDir
+                ]);
+            }
+            
+            // Use the most recently uploaded file
+            usort($files, function($a, $b) {
+                return strcmp($b['modified'], $a['modified']);
+            });
+            
+            $latestFile = $files[0];
+            
+            // Create video record
+            $video = \App\Models\Video::create([
+                'title' => $lesson->title . ' - Video',
+                'lesson_id' => $lesson->id,
+                'original_filename' => $latestFile['name'],
+                'original_path' => $latestFile['path'],
+                'mime_type' => mime_content_type($latestFile['full_path']),
+                'file_size' => $latestFile['size'],
+                'status' => 'pending',
+                'metadata' => [
+                    'uploaded_by' => 'system_debug',
+                    'uploaded_at' => now()->toISOString(),
+                    'created_via' => 'force_create_endpoint'
+                ]
+            ]);
+            
+            // Queue processing job
+            \App\Jobs\ProcessVideoJob::dispatch($video);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Video record created and queued for processing',
+                'video_id' => $video->id,
+                'lesson_id' => $lesson->id,
+                'lesson_title' => $lesson->title,
+                'file_used' => $latestFile,
+                'all_available_files' => $files
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
