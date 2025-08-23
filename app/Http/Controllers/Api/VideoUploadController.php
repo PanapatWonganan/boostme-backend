@@ -362,7 +362,7 @@ class VideoUploadController extends Controller
             },
             200,
             [
-                'Content-Type' => $video->mime_type ?? 'video/mp4',
+                'Content-Type' => $mimeType,
                 'Content-Length' => $fileSize,
                 'Accept-Ranges' => 'bytes',
                 'Cache-Control' => 'no-cache, no-store, private, must-revalidate',
