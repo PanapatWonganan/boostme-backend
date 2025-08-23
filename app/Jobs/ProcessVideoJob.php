@@ -174,14 +174,14 @@ class ProcessVideoJob implements ShouldQueue
         // Update video record
         $this->video->update([
             'status' => 'ready',
-            'hls_path' => $newPath, // Use direct path instead of HLS
+            'hls_path' => $newPath, // Store relative path (e.g., 'videos/uuid/file.mp4')
             'duration_seconds' => 0, // We can't determine duration without FFmpeg
             'metadata' => array_merge($this->video->metadata ?? [], [
                 'processed_at' => now()->toISOString(),
                 'processing_method' => 'direct_copy',
                 'ffmpeg_available' => false,
                 'copied_file_size' => filesize($copiedPath),
-                'copied_file_path' => $copiedPath
+                'copied_file_path' => $newPath  // Store relative path, not absolute
             ])
         ]);
     }

@@ -53,7 +53,7 @@ class EditLesson extends EditRecord
     
     protected function processVideoUpload(string $tempPath): void
     {
-        // Get the uploaded file info
+        // Get the uploaded file info - use storage path for checking but store relative path
         $filePath = storage_path('app/' . $tempPath);
         
         if (file_exists($filePath)) {
@@ -63,12 +63,12 @@ class EditLesson extends EditRecord
                 $existingVideo->update(['status' => 'replaced']);
             }
             
-            // Create new video record
+            // Create new video record - IMPORTANT: Store relative path, not absolute
             $video = Video::create([
                 'title' => $this->record->title . ' - Video',
                 'lesson_id' => $this->record->id,
                 'original_filename' => basename($tempPath),
-                'original_path' => $tempPath,
+                'original_path' => $tempPath,  // This is already relative (e.g., 'temp-videos/file.mp4')
                 'mime_type' => mime_content_type($filePath),
                 'file_size' => filesize($filePath),
                 'status' => 'pending',
