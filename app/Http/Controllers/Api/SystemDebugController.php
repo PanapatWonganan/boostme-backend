@@ -436,4 +436,35 @@ class SystemDebugController extends Controller
             ], 500);
         }
     }
+
+    public function listLessons()
+    {
+        try {
+            $lessons = \App\Models\Lesson::with('primaryVideo')->get()->map(function($lesson) {
+                $video = $lesson->primaryVideo;
+                return [
+                    'id' => $lesson->id,
+                    'title' => $lesson->title,
+                    'video_url' => $lesson->video_url,
+                    'has_video' => $video ? true : false,
+                    'video_status' => $video ? $video->status : null,
+                    'video_id' => $video ? $video->id : null,
+                    'created_at' => $lesson->created_at
+                ];
+            });
+            
+            return response()->json([
+                'success' => true,
+                'lessons' => $lessons,
+                'total_lessons' => $lessons->count(),
+                'total_videos' => \App\Models\Video::count()
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
