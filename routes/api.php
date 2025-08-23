@@ -54,6 +54,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/cleanup-videos', [SystemDebugController::class, 'cleanupOldVideos']);
         Route::get('/list-videos', [SystemDebugController::class, 'listVideos']);
         Route::post('/reprocess-videos', [SystemDebugController::class, 'reprocessVideos']);
+        Route::get('/reprocess-videos', [SystemDebugController::class, 'reprocessVideos']);
     });
     
     // User management routes
