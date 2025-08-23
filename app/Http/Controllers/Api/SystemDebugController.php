@@ -362,4 +362,78 @@ class SystemDebugController extends Controller
             ], 500);
         }
     }
+
+    public function checkVideoFile($videoId)
+    {
+        try {
+            $video = \App\Models\Video::findOrFail($videoId);
+            
+            // Check all possible paths
+            $paths = [
+                storage_path('app/private/' . $video->original_path),
+                storage_path('app/' . $video->original_path),
+                \Illuminate\Support\Facades\Storage::disk('local')->path($video->original_path),
+                '/app/storage/app/private/' . $video->original_path,
+                '/app/storage/app/' . $video->original_path,
+            ];
+            
+            $pathResults = [];
+            $foundPath = null;
+            
+            foreach ($paths as $path) {
+                $exists = file_exists($path);
+                $pathResults[] = [
+                    'path' => $path,
+                    'exists' => $exists,
+                    'size' => $exists ? filesize($path) : null,
+                    'readable' => $exists ? is_readable($path) : null
+                ];
+                
+                if ($exists && !$foundPath) {
+                    $foundPath = $path;
+                }
+            }
+            
+            // List actual files in temp-videos directory
+            $tempVideosPath = '/app/storage/app/private/temp-videos';
+            $actualFiles = [];
+            if (is_dir($tempVideosPath)) {
+                $files = scandir($tempVideosPath);
+                foreach ($files as $file) {
+                    if ($file !== '.' && $file !== '..') {
+                        $actualFiles[] = [
+                            'name' => $file,
+                            'size' => filesize($tempVideosPath . '/' . $file),
+                            'modified' => date('Y-m-d H:i:s', filemtime($tempVideosPath . '/' . $file))
+                        ];
+                    }
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'video_info' => [
+                    'id' => $video->id,
+                    'title' => $video->title,
+                    'original_path' => $video->original_path,
+                    'hls_path' => $video->hls_path,
+                    'status' => $video->status,
+                    'processing_error' => $video->processing_error
+                ],
+                'path_checks' => $pathResults,
+                'found_file' => $foundPath,
+                'temp_videos_directory' => [
+                    'path' => $tempVideosPath,
+                    'exists' => is_dir($tempVideosPath),
+                    'files' => $actualFiles
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
