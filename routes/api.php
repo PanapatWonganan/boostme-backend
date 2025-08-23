@@ -89,7 +89,7 @@ Route::prefix('v1')->group(function () {
             'status' => 'ok',
             'timestamp' => now()->toISOString(),
             'service' => 'BoostMe Admin API',
-            'version' => '1.0.0'
+            'version' => '1.0.6-restored'
         ]);
     });
 });
