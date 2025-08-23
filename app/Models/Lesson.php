@@ -51,6 +51,16 @@ class Lesson extends Model
     
     public function primaryVideo()
     {
+        // Return the latest video regardless of status for display purposes
+        // Frontend will handle status checking
+        return $this->hasOne(Video::class)
+            ->whereNotIn('status', ['replaced', 'deleted'])
+            ->latest();
+    }
+    
+    public function readyVideo()
+    {
+        // Keep this method for cases where we only want ready videos
         return $this->hasOne(Video::class)->where('status', 'ready')->oldest();
     }
 }

@@ -145,8 +145,8 @@ class LessonController extends Controller
      */
     public function getStreamUrl(Request $request, $lessonId)
     {        
-        $lesson = Lesson::with('primaryVideo')->findOrFail($lessonId);
-        $video = $lesson->primaryVideo;
+        $lesson = Lesson::with('readyVideo')->findOrFail($lessonId);
+        $video = $lesson->readyVideo;
         
         if (!$video || !$video->isReady()) {
             return response()->json([
