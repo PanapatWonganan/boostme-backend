@@ -185,10 +185,24 @@ class VideoUploadController extends Controller
      */
     public function stream(Request $request, $videoId)
     {
+        \Log::info('Video stream request:', [
+            'video_id' => $videoId,
+            'user' => $request->query('user'),
+            'expires' => $request->query('expires'),
+            'token_provided' => $request->query('token') ? 'yes' : 'no',
+            'current_time' => now()->timestamp,
+            'ip' => $request->ip()
+        ]);
+        
         // Validate token
         $userId = $request->query('user');
         $expires = $request->query('expires');
         $token = $request->query('token');
+        
+        if (!$userId || !$expires || !$token) {
+            \Log::warning('Missing required parameters for video stream');
+            return response()->json(['message' => 'Missing required parameters'], 400);
+        }
         
         $expectedToken = hash_hmac(
             'sha256',
@@ -196,11 +210,19 @@ class VideoUploadController extends Controller
             config('app.key')
         );
         
+        \Log::debug('Token validation:', [
+            'expected' => substr($expectedToken, 0, 10) . '...',
+            'received' => substr($token, 0, 10) . '...',
+            'match' => hash_equals($expectedToken, $token)
+        ]);
+        
         if (!hash_equals($expectedToken, $token)) {
+            \Log::warning('Invalid token for video stream');
             return response()->json(['message' => 'Invalid token'], 403);
         }
         
         if (now()->timestamp > $expires) {
+            \Log::warning('Expired token for video stream');
             return response()->json(['message' => 'Token expired'], 403);
         }
         
@@ -238,8 +260,21 @@ class VideoUploadController extends Controller
         }
         
         if (!$path || !file_exists($path)) {
+            \Log::error('Video file not found:', [
+                'video_id' => $videoId,
+                'attempted_paths' => $possiblePaths,
+                'found_path' => $path,
+                'video_original_path' => $video->original_path,
+                'video_hls_path' => $video->hls_path
+            ]);
             return response()->json(['message' => 'Video file not found'], 404);
         }
+        
+        \Log::info('Video file found:', [
+            'video_id' => $videoId,
+            'file_path' => $path,
+            'file_size' => filesize($path)
+        ]);
         
         $fileSize = filesize($path);
         $length = $fileSize;

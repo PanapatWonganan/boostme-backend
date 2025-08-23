@@ -10,6 +10,51 @@ use Illuminate\Http\Request;
 class LessonController extends Controller
 {
     /**
+     * Get authenticated user from token
+     */
+    private function getAuthenticatedUser(Request $request)
+    {
+        $authHeader = $request->header('Authorization');
+        if (!$authHeader || !str_starts_with($authHeader, 'Bearer ')) {
+            return null;
+        }
+
+        $token = substr($authHeader, 7); // Remove 'Bearer ' prefix
+        
+        try {
+            // Decode base64 token (same format as garden authentication)
+            $decoded = base64_decode($token);
+            if (!$decoded || !str_contains($decoded, '|')) {
+                return null;
+            }
+
+            list($userId, $tokenHash) = explode('|', $decoded, 2);
+            
+            // Find user
+            $user = \App\Models\User::find($userId);
+            if (!$user) {
+                return null;
+            }
+
+            return $user;
+        } catch (\Exception $e) {
+            \Log::warning('Authentication failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Return authentication error response
+     */
+    private function authError($message = 'Authentication required')
+    {
+        return response()->json([
+            'success' => false,
+            'message' => $message
+        ], 401);
+    }
+
+    /**
      * Get all lessons for a course
      */
     public function getCourseLessons($courseId)
@@ -99,7 +144,7 @@ class LessonController extends Controller
      * Get streaming URL for a lesson's video
      */
     public function getStreamUrl(Request $request, $lessonId)
-    {
+    {        
         $lesson = Lesson::with('primaryVideo')->findOrFail($lessonId);
         $video = $lesson->primaryVideo;
         
@@ -118,9 +163,15 @@ class LessonController extends Controller
             ], 403);
         }
         
-        // Generate signed URL
+        // Generate signed URL - use anonymous for free lessons for now
         $expires = now()->addHours(2);
-        $userId = 'anonymous'; // In production, use auth()->id()
+        $userId = 'anonymous';
+        
+        // Try to get authenticated user if available
+        $user = $this->getAuthenticatedUser($request);
+        if ($user) {
+            $userId = $user->id;
+        }
         
         $token = hash_hmac(
             'sha256',
