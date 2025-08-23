@@ -27,17 +27,36 @@ class EditLesson extends EditRecord
         
         // Try to get video upload from form state
         $formState = $this->form->getState();
+        \Log::info('Full form state keys: ' . implode(', ', array_keys($formState)));
+        
         $videoUpload = $formState['video_upload'] ?? null;
         
-        \Log::info('Video upload data in afterSave:', ['video_upload' => $videoUpload]);
+        \Log::info('Video upload data in afterSave:', [
+            'video_upload' => $videoUpload,
+            'type' => gettype($videoUpload),
+            'empty' => empty($videoUpload)
+        ]);
         
-        if ($videoUpload && !empty($videoUpload)) {
+        // Also try to get from raw state
+        $rawData = $this->form->getRawState();
+        \Log::info('Raw form state keys: ' . implode(', ', array_keys($rawData)));
+        $rawVideoUpload = $rawData['video_upload'] ?? null;
+        \Log::info('Raw video upload:', ['raw_video_upload' => $rawVideoUpload]);
+        
+        // Also check session for video upload
+        $sessionVideoUpload = session('temp_video_upload');
+        \Log::info('Session video upload:', ['session_video_upload' => $sessionVideoUpload]);
+        
+        // Use session data if form state is empty
+        $finalVideoUpload = $videoUpload ?: $sessionVideoUpload;
+        
+        if ($finalVideoUpload && !empty($finalVideoUpload)) {
             try {
                 // Handle different formats of video upload data
-                if (is_array($videoUpload)) {
+                if (is_array($finalVideoUpload)) {
                     // If it's an array, take the first non-empty element
                     $filePath = null;
-                    foreach ($videoUpload as $file) {
+                    foreach ($finalVideoUpload as $file) {
                         if (!empty($file)) {
                             $filePath = $file;
                             break;
@@ -47,16 +66,21 @@ class EditLesson extends EditRecord
                         \Log::info('Processing video upload from array: ' . $filePath);
                         $this->processVideoUpload($filePath);
                     }
-                } elseif (is_string($videoUpload)) {
-                    \Log::info('Processing video upload from string: ' . $videoUpload);
-                    $this->processVideoUpload($videoUpload);
+                } elseif (is_string($finalVideoUpload)) {
+                    \Log::info('Processing video upload from string: ' . $finalVideoUpload);
+                    $this->processVideoUpload($finalVideoUpload);
                 }
             } catch (\Exception $e) {
                 \Log::error('Error processing video upload: ' . $e->getMessage());
                 $this->notify('danger', 'Error processing video upload: ' . $e->getMessage());
+            } finally {
+                // Clear session data
+                session()->forget('temp_video_upload');
             }
         } else {
-            \Log::info('No video upload found in form state');
+            \Log::info('No video upload found in form state or session');
+            // Still clear session in case
+            session()->forget('temp_video_upload');
         }
     }
     
@@ -130,6 +154,22 @@ class EditLesson extends EditRecord
     
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        \Log::info('mutateFormDataBeforeSave called', [
+            'data_keys' => array_keys($data),
+            'video_upload' => $data['video_upload'] ?? 'not_found'
+        ]);
+        
+        // Store video upload info before removing it
+        if (isset($data['video_upload']) && !empty($data['video_upload'])) {
+            \Log::info('Found video_upload in mutateFormDataBeforeSave', [
+                'video_upload' => $data['video_upload'],
+                'type' => gettype($data['video_upload'])
+            ]);
+            
+            // Store it temporarily in session or property for afterSave to use
+            session(['temp_video_upload' => $data['video_upload']]);
+        }
+        
         // Remove video_upload from data as it's not a database field
         unset($data['video_upload']);
         
