@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\AdvancedPlantController;
 use App\Http\Controllers\Api\SeasonalEventController;
 use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\ProgressController;
+use App\Http\Controllers\Api\SystemDebugController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -43,6 +44,12 @@ Route::prefix('v1/auth')->group(function () {
 
 // Public API routes (no authentication required)
 Route::prefix('v1')->group(function () {
+    
+    // Debug routes (remove in production)
+    Route::prefix('debug')->group(function () {
+        Route::get('/system', [SystemDebugController::class, 'checkSystem']);
+        Route::post('/test-upload', [SystemDebugController::class, 'testUpload']);
+    });
     
     // User management routes
     Route::prefix('users')->group(function () {

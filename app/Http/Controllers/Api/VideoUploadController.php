@@ -24,7 +24,7 @@ class VideoUploadController extends Controller
             'video' => [
                 'required',
                 File::types(['mp4', 'mov', 'avi', 'webm'])
-                    ->max(2 * 1024 * 1024), // 2GB max
+                    ->max(500 * 1024), // 500MB max for Railway (reduced from 2GB)
             ],
             'lesson_id' => 'nullable|exists:lessons,id',
             'title' => 'required|string|max:255',
