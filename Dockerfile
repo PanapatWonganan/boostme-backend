@@ -51,6 +51,8 @@ RUN php artisan storage:link
 # Force HTTPS in production
 ENV APP_URL=https://boostme-backend-production.up.railway.app
 ENV ASSET_URL=https://boostme-backend-production.up.railway.app
+ENV FORCE_HTTPS=true
+ENV APP_ENV=production
 
 # Run migrations and create admin user if not exists
 CMD php artisan migrate --force && \

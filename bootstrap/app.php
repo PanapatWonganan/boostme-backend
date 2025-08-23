@@ -14,7 +14,18 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'cors' => \Fruitcake\Cors\HandleCors::class,
+            'force.https' => \App\Http\Middleware\ForceHttps::class,
         ]);
+        
+        // Trust proxies for Railway
+        $middleware->trustProxies(at: '*');
+        
+        // Apply ForceHttps to web routes in production
+        if (config('app.env') === 'production') {
+            $middleware->web(append: [
+                \App\Http\Middleware\ForceHttps::class,
+            ]);
+        }
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
