@@ -84,17 +84,73 @@ class LessonResource extends Resource
                             ->disk('local')
                             ->directory('temp-videos')
                             ->acceptedFileTypes(['video/mp4', 'video/mov', 'video/avi', 'video/webm'])
-                            ->maxSize(2097152) // 2GB in KB
+                            ->maxSize(512000) // 500MB in KB for Railway
                             ->preserveFilenames()
                             ->downloadable()
                             ->previewable(false)
-                            ->helperText('Max file size: 2GB. Supported formats: MP4, MOV, AVI, WebM')
-                            ->afterStateUpdated(function ($state, $set, $get) {
-                                if ($state) {
-                                    // Auto-fill duration if possible (this would need FFmpeg)
-                                    $set('video_status', 'pending');
+                            ->helperText('Max file size: 500MB. Supported formats: MP4, MOV, AVI, WebM')
+                            ->afterStateUpdated(function ($state, $set, $get, $record) {
+                                \Log::info('FileUpload afterStateUpdated called', [
+                                    'state' => $state,
+                                    'record_id' => $record?->id
+                                ]);
+                                
+                                if ($state && $record) {
+                                    try {
+                                        // Process video upload immediately when file is uploaded
+                                        $filePath = is_array($state) ? $state[0] : $state;
+                                        
+                                        if ($filePath) {
+                                            \Log::info('Processing video upload in afterStateUpdated', [
+                                                'file_path' => $filePath
+                                            ]);
+                                            
+                                            // Check if file exists
+                                            $fullPath = storage_path('app/' . $filePath);
+                                            if (file_exists($fullPath)) {
+                                                // Check for existing video
+                                                $existingVideo = $record->primaryVideo;
+                                                if ($existingVideo) {
+                                                    $existingVideo->update(['status' => 'replaced']);
+                                                }
+                                                
+                                                // Create video record
+                                                $video = \App\Models\Video::create([
+                                                    'title' => $record->title . ' - Video',
+                                                    'lesson_id' => $record->id,
+                                                    'original_filename' => basename($filePath),
+                                                    'original_path' => $filePath,
+                                                    'mime_type' => mime_content_type($fullPath),
+                                                    'file_size' => filesize($fullPath),
+                                                    'status' => 'pending',
+                                                    'metadata' => [
+                                                        'uploaded_by' => auth()->id(),
+                                                        'uploaded_at' => now()->toISOString(),
+                                                    ]
+                                                ]);
+                                                
+                                                // Queue processing
+                                                \App\Jobs\ProcessVideoJob::dispatch($video);
+                                                
+                                                \Log::info('Video created successfully', [
+                                                    'video_id' => $video->id
+                                                ]);
+                                                
+                                                // Update status display
+                                                $set('video_status', 'processing');
+                                            } else {
+                                                \Log::error('Video file not found', ['path' => $fullPath]);
+                                            }
+                                        }
+                                    } catch (\Exception $e) {
+                                        \Log::error('Error in afterStateUpdated', [
+                                            'error' => $e->getMessage(),
+                                            'trace' => $e->getTraceAsString()
+                                        ]);
+                                    }
                                 }
                             })
+                            ->live()
                             ->dehydrated(false),
                             
                         Forms\Components\TextInput::make('video_url')
@@ -252,6 +308,80 @@ class LessonResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('upload_video')
+                    ->label('Upload Video')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('success')
+                    ->form([
+                        Forms\Components\FileUpload::make('video_file')
+                            ->label('Select Video File')
+                            ->disk('local')
+                            ->directory('temp-videos')
+                            ->acceptedFileTypes(['video/mp4', 'video/mov', 'video/avi', 'video/webm'])
+                            ->maxSize(512000) // 500MB
+                            ->required()
+                            ->helperText('Max 500MB. MP4, MOV, AVI, WebM supported')
+                    ])
+                    ->action(function ($record, array $data) {
+                        try {
+                            \Log::info('Manual video upload action', [
+                                'lesson_id' => $record->id,
+                                'data' => $data
+                            ]);
+                            
+                            $filePath = $data['video_file'];
+                            if (!$filePath) {
+                                throw new \Exception('No video file uploaded');
+                            }
+                            
+                            $fullPath = storage_path('app/' . $filePath);
+                            if (!file_exists($fullPath)) {
+                                throw new \Exception('Video file not found at: ' . $fullPath);
+                            }
+                            
+                            // Check for existing video
+                            $existingVideo = $record->primaryVideo;
+                            if ($existingVideo) {
+                                $existingVideo->update(['status' => 'replaced']);
+                            }
+                            
+                            // Create video record
+                            $video = \App\Models\Video::create([
+                                'title' => $record->title . ' - Video',
+                                'lesson_id' => $record->id,
+                                'original_filename' => basename($filePath),
+                                'original_path' => $filePath,
+                                'mime_type' => mime_content_type($fullPath),
+                                'file_size' => filesize($fullPath),
+                                'status' => 'pending',
+                                'metadata' => [
+                                    'uploaded_by' => auth()->id(),
+                                    'uploaded_at' => now()->toISOString(),
+                                ]
+                            ]);
+                            
+                            // Queue processing
+                            \App\Jobs\ProcessVideoJob::dispatch($video);
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->title('Video uploaded successfully')
+                                ->body('Video is being processed')
+                                ->success()
+                                ->send();
+                                
+                        } catch (\Exception $e) {
+                            \Log::error('Video upload error', [
+                                'error' => $e->getMessage()
+                            ]);
+                            
+                            \Filament\Notifications\Notification::make()
+                                ->title('Upload failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    })
+                    ->visible(fn ($record) => !$record->primaryVideo || $record->primaryVideo->status === 'failed'),
                 Tables\Actions\Action::make('reorder')
                     ->label('Reorder')
                     ->icon('heroicon-o-arrows-up-down')
