@@ -60,7 +60,9 @@ class Lesson extends Model
     
     public function readyVideo()
     {
-        // Keep this method for cases where we only want ready videos
-        return $this->hasOne(Video::class)->where('status', 'ready')->oldest();
+        // Return only ready videos for streaming
+        return $this->hasOne(Video::class)
+            ->where('status', 'ready')
+            ->latest();
     }
 }

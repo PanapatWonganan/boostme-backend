@@ -233,29 +233,37 @@ class VideoUploadController extends Controller
         }
         
         // Serve the processed video file
-        // If HLS path exists, use it; otherwise fallback to processed video
-        if ($video->hls_path && !str_ends_with($video->hls_path, '.m3u8')) {
-            // Direct video file (not HLS)
-            $path = Storage::disk('local')->path($video->hls_path);
-            \Log::debug('Using HLS path:', ['path' => $path]);
-        } else {
-            // Try to find the original file with correct path handling
-            $originalPath = $video->original_path;
+        $path = null;
+        
+        // Priority order: hls_path first (processed), then original_path
+        $pathsToTry = [];
+        
+        if ($video->hls_path) {
+            $pathsToTry[] = $video->hls_path;
+        }
+        if ($video->original_path) {
+            $pathsToTry[] = $video->original_path;
+        }
+        
+        foreach ($pathsToTry as $videoPath) {
             $possiblePaths = [
-                storage_path('app/private/' . $originalPath),
-                storage_path('app/' . $originalPath),
-                Storage::disk('local')->path($originalPath),
-                '/app/storage/app/private/' . $originalPath,  // Railway absolute path
-                '/app/storage/app/' . $originalPath,  // Railway alternate path
-                storage_path('app/private/' . $video->hls_path), // Try hls_path too
-                Storage::disk('local')->path($video->hls_path ?? '')
+                // Railway production paths
+                '/app/storage/app/' . ltrim($videoPath, '/'),
+                '/app/storage/app/private/' . ltrim($videoPath, '/'),
+                // Local development paths  
+                storage_path('app/' . ltrim($videoPath, '/')),
+                storage_path('app/private/' . ltrim($videoPath, '/')),
+                // Laravel Storage facade paths
+                Storage::disk('local')->path($videoPath),
+                // Absolute path if provided
+                $videoPath
             ];
             
-            $path = null;
             foreach ($possiblePaths as $testPath) {
                 if (file_exists($testPath)) {
                     $path = $testPath;
-                    break;
+                    \Log::info('Video file found:', ['path' => $testPath]);
+                    break 2; // Break both loops
                 }
             }
         }
@@ -263,10 +271,10 @@ class VideoUploadController extends Controller
         if (!$path || !file_exists($path)) {
             \Log::error('Video file not found:', [
                 'video_id' => $videoId,
-                'attempted_paths' => $possiblePaths,
-                'found_path' => $path,
+                'paths_tried' => $pathsToTry,
                 'video_original_path' => $video->original_path,
-                'video_hls_path' => $video->hls_path
+                'video_hls_path' => $video->hls_path,
+                'video_status' => $video->status
             ]);
             return response()->json(['message' => 'Video file not found'], 404);
         }
