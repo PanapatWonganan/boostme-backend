@@ -266,4 +266,56 @@ class SystemDebugController extends Controller
             ], 500);
         }
     }
+    
+    public function cleanupOldVideos()
+    {
+        try {
+            // Find videos with localhost paths
+            $oldVideos = \App\Models\Video::where('original_path', 'like', '%/Users/panapat/%')
+                ->orWhere('original_path', 'like', '%localhost%')
+                ->orWhere('original_path', 'like', '%fitness-lms-admin%')
+                ->get();
+                
+            $deletedCount = $oldVideos->count();
+            
+            foreach ($oldVideos as $video) {
+                // Also delete related records if any
+                $video->accessLogs()->delete();
+                $video->delete();
+            }
+            
+            return response()->json([
+                'success' => true,
+                'deleted_count' => $deletedCount,
+                'message' => "Deleted {$deletedCount} old video records with localhost paths"
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+    public function listVideos()
+    {
+        try {
+            $videos = \App\Models\Video::latest()->take(10)->get([
+                'id', 'title', 'status', 'original_path', 'hls_path', 'created_at'
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'videos' => $videos,
+                'total_videos' => \App\Models\Video::count()
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
