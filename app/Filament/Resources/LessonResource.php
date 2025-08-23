@@ -83,6 +83,7 @@ class LessonResource extends Resource
                             ->label('Upload Video')
                             ->disk('local')
                             ->directory('temp-videos')
+                            ->visibility('private')
                             ->acceptedFileTypes(['video/mp4', 'video/mov', 'video/avi', 'video/webm'])
                             ->maxSize(512000) // 500MB in KB for Railway
                             ->preserveFilenames()
@@ -317,9 +318,11 @@ class LessonResource extends Resource
                             ->label('Select Video File')
                             ->disk('local')
                             ->directory('temp-videos')
+                            ->visibility('private')
                             ->acceptedFileTypes(['video/mp4', 'video/mov', 'video/avi', 'video/webm'])
                             ->maxSize(512000) // 500MB
                             ->required()
+                            ->preserveFilenames()
                             ->helperText('Max 500MB. MP4, MOV, AVI, WebM supported')
                     ])
                     ->action(function ($record, array $data) {
@@ -334,9 +337,58 @@ class LessonResource extends Resource
                                 throw new \Exception('No video file uploaded');
                             }
                             
-                            $fullPath = storage_path('app/' . $filePath);
-                            if (!file_exists($fullPath)) {
-                                throw new \Exception('Video file not found at: ' . $fullPath);
+                            // Handle array of files
+                            if (is_array($filePath)) {
+                                $filePath = $filePath[0] ?? null;
+                            }
+                            
+                            if (!$filePath) {
+                                throw new \Exception('No video file in upload data');
+                            }
+                            
+                            \Log::info('Checking video file paths', [
+                                'relative_path' => $filePath,
+                                'storage_path' => storage_path('app/' . $filePath),
+                                'storage_private_path' => storage_path('app/private/' . $filePath),
+                            ]);
+                            
+                            // Try different path combinations
+                            $possiblePaths = [
+                                storage_path('app/' . $filePath),
+                                storage_path('app/private/' . $filePath),
+                                storage_path('app/public/' . $filePath),
+                                '/app/storage/app/' . $filePath,
+                                '/app/storage/app/private/' . $filePath,
+                            ];
+                            
+                            $fullPath = null;
+                            foreach ($possiblePaths as $path) {
+                                if (file_exists($path)) {
+                                    $fullPath = $path;
+                                    \Log::info('Found file at: ' . $path);
+                                    break;
+                                }
+                            }
+                            
+                            if (!$fullPath) {
+                                // Log what files actually exist in temp-videos directory
+                                $tempDir = storage_path('app/temp-videos');
+                                $privateDir = storage_path('app/private/temp-videos');
+                                $files = [];
+                                
+                                if (is_dir($tempDir)) {
+                                    $files['app/temp-videos'] = scandir($tempDir);
+                                }
+                                if (is_dir($privateDir)) {
+                                    $files['app/private/temp-videos'] = scandir($privateDir);
+                                }
+                                
+                                \Log::error('Video file not found', [
+                                    'tried_paths' => $possiblePaths,
+                                    'existing_files' => $files
+                                ]);
+                                
+                                throw new \Exception('Video file not found after checking all paths');
                             }
                             
                             // Check for existing video
