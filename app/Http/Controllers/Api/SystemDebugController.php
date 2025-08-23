@@ -267,9 +267,64 @@ class SystemDebugController extends Controller
         }
     }
     
-    public function cleanupOldVideos()
+    public function cleanupOldVideos(Request $request)
     {
         try {
+            // Check for force cleanup of videos without files
+            if ($request->has('force_delete_missing')) {
+                $videos = \App\Models\Video::all();
+                $deletedCount = 0;
+                
+                foreach ($videos as $video) {
+                    // Check if video file exists
+                    $pathExists = false;
+                    
+                    if ($video->hls_path) {
+                        $possiblePaths = [
+                            storage_path('app/' . ltrim($video->hls_path, '/')),
+                            storage_path('app/private/' . ltrim($video->hls_path, '/')),
+                            '/app/storage/app/' . ltrim($video->hls_path, '/'),
+                            '/app/storage/app/private/' . ltrim($video->hls_path, '/'),
+                        ];
+                        
+                        foreach ($possiblePaths as $path) {
+                            if (file_exists($path)) {
+                                $pathExists = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if ($video->original_path && !$pathExists) {
+                        $possiblePaths = [
+                            storage_path('app/' . ltrim($video->original_path, '/')),
+                            storage_path('app/private/' . ltrim($video->original_path, '/')),
+                            '/app/storage/app/' . ltrim($video->original_path, '/'),
+                            '/app/storage/app/private/' . ltrim($video->original_path, '/'),
+                        ];
+                        
+                        foreach ($possiblePaths as $path) {
+                            if (file_exists($path)) {
+                                $pathExists = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!$pathExists) {
+                        $video->accessLogs()->delete();
+                        $video->delete();
+                        $deletedCount++;
+                    }
+                }
+                
+                return response()->json([
+                    'success' => true,
+                    'deleted_count' => $deletedCount,
+                    'message' => "Deleted {$deletedCount} video records without actual files"
+                ]);
+            }
+            
             // Find videos with localhost paths
             $oldVideos = \App\Models\Video::where('original_path', 'like', '%/Users/panapat/%')
                 ->orWhere('original_path', 'like', '%localhost%')
