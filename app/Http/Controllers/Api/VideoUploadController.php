@@ -277,6 +277,9 @@ class VideoUploadController extends Controller
                     'Content-Length' => $length,
                     'Accept-Ranges' => 'bytes',
                     'Content-Range' => "bytes $start-$end/$fileSize",
+                    'Access-Control-Allow-Origin' => '*',
+                    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                    'Access-Control-Allow-Headers' => 'Range, Content-Type',
                 ]
             );
         }
