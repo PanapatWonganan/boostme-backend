@@ -128,6 +128,7 @@ Route::prefix('v1/garden')->group(function () {
     // Daily Challenges
     Route::get('/challenges/today', [ChallengeController::class, 'getTodayChallenges']);
     Route::post('/challenges/create-sample', [ChallengeController::class, 'createSampleChallenges']);
+    Route::get('/challenges/create-sample', [ChallengeController::class, 'createSampleChallenges']);
     Route::get('/challenges/history', [ChallengeController::class, 'getChallengeHistory']);
     Route::put('/challenges/{challengeId}/progress', [ChallengeController::class, 'updateProgress']);
     Route::get('/challenges/leaderboard', [ChallengeController::class, 'getLeaderboard']);
