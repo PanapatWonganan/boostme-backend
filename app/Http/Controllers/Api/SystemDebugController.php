@@ -318,4 +318,48 @@ class SystemDebugController extends Controller
             ], 500);
         }
     }
+
+    public function reprocessVideos(Request $request)
+    {
+        try {
+            $videosToReprocess = \App\Models\Video::whereIn('status', ['pending', 'failed'])
+                ->orWhere(function($query) {
+                    $query->where('status', 'processing')
+                          ->where('created_at', '<', now()->subMinutes(10)); // Stuck for more than 10 minutes
+                })
+                ->get();
+
+            $processedCount = 0;
+            
+            foreach ($videosToReprocess as $video) {
+                $video->update([
+                    'status' => 'pending',
+                    'processing_error' => null
+                ]);
+                
+                \App\Jobs\ProcessVideoJob::dispatch($video);
+                $processedCount++;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Videos queued for reprocessing',
+                'reprocessed_count' => $processedCount,
+                'videos' => $videosToReprocess->map(function($video) {
+                    return [
+                        'id' => $video->id,
+                        'title' => $video->title,
+                        'previous_status' => $video->status,
+                        'created_at' => $video->created_at->diffForHumans()
+                    ];
+                })
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
