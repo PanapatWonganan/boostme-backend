@@ -55,11 +55,13 @@ class ProcessVideoJob implements ShouldQueue
             $originalPath = $this->video->original_path;
             
             // Try different path combinations to find the file
+            // Railway stores files in /app/storage/app/private
             $possiblePaths = [
                 storage_path('app/private/' . $originalPath),
                 storage_path('app/' . $originalPath),
-                Storage::disk('local')->path('private/' . $originalPath),
-                Storage::disk('local')->path($originalPath)
+                Storage::disk('local')->path($originalPath),
+                '/app/storage/app/private/' . $originalPath,  // Railway absolute path
+                '/app/storage/app/' . $originalPath  // Railway alternate path
             ];
             
             $inputPath = null;
@@ -71,6 +73,15 @@ class ProcessVideoJob implements ShouldQueue
             }
             
             if (!$inputPath) {
+                // Log all attempted paths for debugging
+                foreach ($possiblePaths as $path) {
+                    Log::warning("Checked path: {$path} - exists: " . (file_exists($path) ? 'yes' : 'no'));
+                }
+                
+                // List actual files in storage for debugging
+                $storageFiles = Storage::disk('local')->files('temp-videos');
+                Log::warning("Files in temp-videos: " . json_encode($storageFiles));
+                
                 $pathsList = implode(', ', $possiblePaths);
                 throw new \Exception("Video file not found in any of these paths: {$pathsList}");
             }
@@ -79,8 +90,9 @@ class ProcessVideoJob implements ShouldQueue
                 throw new \Exception("Video file not found: {$inputPath}");
             }
             
-            // Check if FFmpeg is available
-            $ffmpegAvailable = $this->checkFFmpegAvailable();
+            // Skip FFmpeg check for Railway - always use basic processing
+            // Railway doesn't have FFmpeg installed by default
+            $ffmpegAvailable = false; // Force to use basic processing
             
             if ($ffmpegAvailable) {
                 // Full processing with FFmpeg

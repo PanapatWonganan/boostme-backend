@@ -52,8 +52,17 @@ class VideoUploadController extends Controller
                 ]
             ]);
             
-            // Queue video processing job
-            ProcessVideoJob::dispatch($video);
+            // Process video immediately instead of queuing (for Railway deployment)
+            // ProcessVideoJob::dispatch($video);
+            
+            // Direct processing for Railway without queue
+            try {
+                $job = new \App\Jobs\ProcessVideoJob($video);
+                $job->handle();
+            } catch (\Exception $e) {
+                \Log::error('Direct video processing failed: ' . $e->getMessage());
+                // Continue anyway - video is uploaded
+            }
             
             DB::commit();
             
@@ -212,8 +221,11 @@ class VideoUploadController extends Controller
             $possiblePaths = [
                 storage_path('app/private/' . $originalPath),
                 storage_path('app/' . $originalPath),
-                Storage::disk('local')->path('private/' . $originalPath),
-                Storage::disk('local')->path($originalPath)
+                Storage::disk('local')->path($originalPath),
+                '/app/storage/app/private/' . $originalPath,  // Railway absolute path
+                '/app/storage/app/' . $originalPath,  // Railway alternate path
+                storage_path('app/private/' . $video->hls_path), // Try hls_path too
+                Storage::disk('local')->path($video->hls_path ?? '')
             ];
             
             $path = null;
