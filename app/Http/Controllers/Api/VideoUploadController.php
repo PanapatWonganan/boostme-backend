@@ -274,9 +274,22 @@ class VideoUploadController extends Controller
                 'paths_tried' => $pathsToTry,
                 'video_original_path' => $video->original_path,
                 'video_hls_path' => $video->hls_path,
-                'video_status' => $video->status
+                'video_status' => $video->status,
+                'video_created_at' => $video->created_at,
+                'all_possible_paths' => $possiblePaths ?? []
             ]);
-            return response()->json(['message' => 'Video file not found'], 404);
+            
+            // Return 404 with debug info for development
+            return response()->json([
+                'message' => 'Video file not found on server storage',
+                'debug' => [
+                    'video_id' => $videoId,
+                    'status' => $video->status,
+                    'original_path' => $video->original_path,
+                    'hls_path' => $video->hls_path,
+                    'suggestion' => 'Please re-upload the video file through admin panel'
+                ]
+            ], 404);
         }
         
         $fileSize = filesize($path);
