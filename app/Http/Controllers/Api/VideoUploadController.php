@@ -237,6 +237,7 @@ class VideoUploadController extends Controller
         if ($video->hls_path && !str_ends_with($video->hls_path, '.m3u8')) {
             // Direct video file (not HLS)
             $path = Storage::disk('local')->path($video->hls_path);
+            \Log::debug('Using HLS path:', ['path' => $path]);
         } else {
             // Try to find the original file with correct path handling
             $originalPath = $video->original_path;
@@ -270,13 +271,16 @@ class VideoUploadController extends Controller
             return response()->json(['message' => 'Video file not found'], 404);
         }
         
+        $fileSize = filesize($path);
+        $mimeType = $this->detectVideoMimeType($path, $video->mime_type);
+        
         \Log::info('Video file found:', [
             'video_id' => $videoId,
             'file_path' => $path,
-            'file_size' => filesize($path)
+            'file_size' => $fileSize,
+            'mime_type' => $mimeType,
+            'video_mime_type' => $video->mime_type
         ]);
-        
-        $fileSize = filesize($path);
         $length = $fileSize;
         $start = 0;
         $end = $fileSize - 1;
@@ -320,7 +324,7 @@ class VideoUploadController extends Controller
                 },
                 206,
                 [
-                    'Content-Type' => $video->mime_type ?? 'video/mp4',
+                    'Content-Type' => $mimeType,
                     'Content-Length' => $length,
                     'Accept-Ranges' => 'bytes',
                     'Content-Range' => "bytes $start-$end/$fileSize",
@@ -399,5 +403,45 @@ class VideoUploadController extends Controller
             'message' => 'Access log updated',
             'log_id' => $log->id
         ]);
+    }
+    
+    /**
+     * Detect proper MIME type for video file
+     */
+    private function detectVideoMimeType(string $filePath, ?string $storedMimeType): string
+    {
+        // Try to detect MIME type from file extension
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        
+        $mimeMap = [
+            'mp4' => 'video/mp4',
+            'mov' => 'video/quicktime',
+            'avi' => 'video/x-msvideo',
+            'webm' => 'video/webm',
+            'm4v' => 'video/x-m4v',
+        ];
+        
+        // Use extension-based MIME type if available
+        if (isset($mimeMap[$extension])) {
+            return $mimeMap[$extension];
+        }
+        
+        // Try using PHP's finfo if available
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $detectedMime = finfo_file($finfo, $filePath);
+                finfo_close($finfo);
+                
+                if ($detectedMime && str_starts_with($detectedMime, 'video/')) {
+                    return $detectedMime;
+                }
+            }
+        }
+        
+        // Fallback to stored MIME type or default
+        return $storedMimeType && str_starts_with($storedMimeType, 'video/') 
+            ? $storedMimeType 
+            : 'video/mp4';
     }
 }

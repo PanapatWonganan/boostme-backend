@@ -49,6 +49,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('debug')->group(function () {
         Route::get('/system', [SystemDebugController::class, 'checkSystem']);
         Route::post('/test-upload', [SystemDebugController::class, 'testUpload']);
+        Route::get('/video/{videoId}', [SystemDebugController::class, 'testVideoStream']);
     });
     
     // User management routes

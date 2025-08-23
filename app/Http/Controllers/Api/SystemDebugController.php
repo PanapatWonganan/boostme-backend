@@ -102,6 +102,80 @@ class SystemDebugController extends Controller
         ]);
     }
     
+    public function testVideoStream(Request $request, $videoId)
+    {
+        try {
+            $video = \App\Models\Video::findOrFail($videoId);
+            
+            $info = [
+                'video_id' => $video->id,
+                'title' => $video->title,
+                'status' => $video->status,
+                'ready' => $video->isReady(),
+                'original_path' => $video->original_path,
+                'hls_path' => $video->hls_path,
+                'mime_type' => $video->mime_type,
+                'file_size' => $video->file_size,
+            ];
+            
+            // Check if files exist
+            $possiblePaths = [
+                storage_path('app/private/' . $video->original_path),
+                storage_path('app/' . $video->original_path),
+                Storage::disk('local')->path($video->original_path),
+                '/app/storage/app/private/' . $video->original_path,
+                '/app/storage/app/' . $video->original_path,
+                storage_path('app/private/' . $video->hls_path),
+                Storage::disk('local')->path($video->hls_path ?? '')
+            ];
+            
+            $pathChecks = [];
+            $foundPath = null;
+            
+            foreach ($possiblePaths as $path) {
+                $exists = file_exists($path);
+                $pathChecks[] = [
+                    'path' => $path,
+                    'exists' => $exists,
+                    'size' => $exists ? filesize($path) : 0,
+                ];
+                
+                if ($exists && !$foundPath) {
+                    $foundPath = $path;
+                }
+            }
+            
+            $info['path_checks'] = $pathChecks;
+            $info['found_path'] = $foundPath;
+            
+            if ($foundPath) {
+                // Try to detect MIME type
+                $extension = strtolower(pathinfo($foundPath, PATHINFO_EXTENSION));
+                $info['file_extension'] = $extension;
+                
+                if (function_exists('finfo_open')) {
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    if ($finfo) {
+                        $detectedMime = finfo_file($finfo, $foundPath);
+                        finfo_close($finfo);
+                        $info['detected_mime'] = $detectedMime;
+                    }
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'video_info' => $info,
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
     public function testUpload(Request $request)
     {
         // Simple test upload without processing
