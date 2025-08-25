@@ -67,8 +67,9 @@ class GardenController extends Controller
             // สร้างสวนใหม่ถ้ายังไม่มี
             $garden = $user->getOrCreateGarden();
             
-            // โหลดข้อมูลพืชทั้งหมดในสวน
+            // โหลดข้อมูลพืชทั้งหมดในสวน - เพิ่ม where user_id เพื่อความแน่ใจ
             $plants = $garden->plants()
+                ->where('user_id', $user->id)
                 ->with('plantType')
                 ->orderBy('planted_at', 'desc')
                 ->get()
@@ -91,8 +92,9 @@ class GardenController extends Controller
                     ];
                 });
 
-            // กิจกรรมล่าสุด
+            // กิจกรรมล่าสุด - เพิ่ม where user_id
             $recentActivities = $garden->activities()
+                ->where('user_id', $user->id)
                 ->with('user')
                 ->recent(7)
                 ->take(10)
@@ -110,14 +112,14 @@ class GardenController extends Controller
                     ];
                 });
 
-            // สถิติของสวน
+            // สถิติของสวน - เพิ่ม where user_id ในการ query
             $stats = [
                 'total_plants' => $plants->count(),
                 'growing_plants' => $plants->where('is_fully_grown', false)->count(),
                 'mature_plants' => $plants->where('is_fully_grown', true)->count(),
                 'plants_need_water' => $plants->where('needs_watering', true)->count(),
-                'total_xp_today' => $garden->activities()->today()->sum('xp_earned'),
-                'total_activities_today' => $garden->activities()->today()->count()
+                'total_xp_today' => $garden->activities()->where('user_id', $user->id)->today()->sum('xp_earned'),
+                'total_activities_today' => $garden->activities()->where('user_id', $user->id)->today()->count()
             ];
 
             return response()->json([
@@ -155,12 +157,11 @@ class GardenController extends Controller
     public function getPlantTypes(Request $request): JsonResponse
     {
         try {
-            // For testing - use demo user if no auth
             $user = $this->getAuthenticatedUser($request);
             if (!$user) {
                 return $this->authError();
             }
-            $garden = $user ? $user->getOrCreateGarden() : null;
+            $garden = $user->getOrCreateGarden();
 
             $plantTypes = PlantType::active()
                 ->unlockedForLevel($garden ? $garden->level : 1)
@@ -208,7 +209,6 @@ class GardenController extends Controller
                 'position.y' => 'nullable|integer|min:0|max:10'
             ]);
 
-            // For testing - use demo user if no auth
             $user = $this->getAuthenticatedUser($request);
             if (!$user) {
                 return $this->authError();
@@ -330,7 +330,6 @@ class GardenController extends Controller
     public function waterPlant(Request $request, string $userPlantId): JsonResponse
     {
         try {
-            // For testing - use demo user if no auth
             $user = $this->getAuthenticatedUser($request);
             if (!$user) {
                 return $this->authError();
@@ -408,7 +407,6 @@ class GardenController extends Controller
     public function harvestPlant(Request $request, string $userPlantId): JsonResponse
     {
         try {
-            // For testing - use demo user if no auth
             $user = $this->getAuthenticatedUser($request);
             if (!$user) {
                 return $this->authError();
@@ -478,7 +476,6 @@ class GardenController extends Controller
     public function waterGarden(Request $request): JsonResponse
     {
         try {
-            // For testing - use demo user if no auth
             $user = $this->getAuthenticatedUser($request);
             if (!$user) {
                 return $this->authError();
@@ -497,8 +494,11 @@ class GardenController extends Controller
 
             $garden->water();
 
-            // รดน้ำพืชทั้งหมดที่ต้องการน้ำ
-            $plantsNeedingWater = $garden->plants()->needsWatering()->get();
+            // รดน้ำพืชทั้งหมดที่ต้องการน้ำ - เพิ่ม where user_id
+            $plantsNeedingWater = $garden->plants()
+                ->where('user_id', $user->id)
+                ->needsWatering()
+                ->get();
             $wateredCount = 0;
 
             foreach ($plantsNeedingWater as $plant) {

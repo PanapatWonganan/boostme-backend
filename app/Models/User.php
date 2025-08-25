@@ -191,19 +191,21 @@ class User extends Authenticatable implements FilamentUser
     // Helper methods for Garden
     public function getOrCreateGarden()
     {
-        if (!$this->garden) {
-            return $this->garden()->create([
+        // ใช้ firstOrCreate เพื่อป้องกันการสร้างซ้ำและดึงข้อมูลที่ถูกต้อง
+        return $this->garden()->firstOrCreate(
+            ['user_id' => $this->id],
+            [
                 'level' => 1,
                 'xp' => 0,
                 'star_seeds' => 100,
-                'theme' => 'tropical'
-            ]);
-        }
-        return $this->garden;
+                'theme' => 'tropical',
+                'last_visited_at' => now()
+            ]
+        );
     }
 
     public function hasGarden(): bool
     {
-        return $this->garden !== null;
+        return $this->garden()->exists();
     }
 }
