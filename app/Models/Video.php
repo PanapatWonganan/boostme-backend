@@ -17,6 +17,7 @@ class Video extends Model
         'original_filename',
         'original_path',
         'hls_path',
+        'processed_path',
         'encryption_key',
         'duration_seconds',
         'file_size',

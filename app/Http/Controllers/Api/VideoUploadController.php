@@ -235,12 +235,25 @@ class VideoUploadController extends Controller
         // Serve the processed video file
         $path = null;
         
-        // Priority order: hls_path first (processed), then original_path
+        // Priority order: processed_path first, then hls_path (if HLS), then original_path
         $pathsToTry = [];
         
-        if ($video->hls_path) {
+        // Check metadata to determine if this is HLS or direct MP4
+        $metadata = $video->metadata ?? [];
+        $isHLS = ($metadata['is_hls'] ?? false) || str_contains($video->hls_path ?? '', '.m3u8');
+        
+        if ($isHLS && $video->hls_path) {
+            // This is an HLS stream
             $pathsToTry[] = $video->hls_path;
+        } elseif (isset($metadata['copied_file_path'])) {
+            // This is a processed MP4 file (new format)
+            $pathsToTry[] = $metadata['copied_file_path'];
+        } elseif ($video->processed_path ?? false) {
+            // Fallback to processed_path field
+            $pathsToTry[] = $video->processed_path;
         }
+        
+        // Always try original_path as final fallback
         if ($video->original_path) {
             $pathsToTry[] = $video->original_path;
         }
@@ -349,9 +362,12 @@ class VideoUploadController extends Controller
                     'Content-Length' => $length,
                     'Accept-Ranges' => 'bytes',
                     'Content-Range' => "bytes $start-$end/$fileSize",
-                    'Access-Control-Allow-Origin' => '*',
-                    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
-                    'Access-Control-Allow-Headers' => 'Range, Content-Type',
+                    'Access-Control-Allow-Origin' => config('app.frontend_url', '*'),
+                    'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+                    'Access-Control-Allow-Headers' => 'Range, Content-Type, Authorization',
+                    'Access-Control-Expose-Headers' => 'Content-Length, Content-Range, Accept-Ranges',
+                    'Connection' => 'keep-alive',
+                    'X-Accel-Buffering' => 'no',
                 ]
             );
         }
@@ -365,7 +381,7 @@ class VideoUploadController extends Controller
                     echo fread($stream, $chunkSize);
                     flush();
                     
-                    // Small delay to prevent overwhelming the connection
+                    // Check connection status to prevent overwhelming
                     if (connection_status() != CONNECTION_NORMAL) {
                         break;
                     }
@@ -378,12 +394,17 @@ class VideoUploadController extends Controller
                 'Content-Type' => $mimeType,
                 'Content-Length' => $fileSize,
                 'Accept-Ranges' => 'bytes',
-                'Cache-Control' => 'no-cache, no-store, private, must-revalidate',
-                'Access-Control-Allow-Origin' => '*',
-                'Access-Control-Allow-Headers' => 'Range',
-                'Content-Disposition' => 'inline; filename="secure_video.mp4"',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Access-Control-Allow-Origin' => config('app.frontend_url', '*'),
+                'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Range, Content-Type, Authorization',
+                'Access-Control-Expose-Headers' => 'Content-Length, Content-Range, Accept-Ranges',
+                'Content-Disposition' => 'inline',
                 'X-Content-Type-Options' => 'nosniff',
                 'X-Frame-Options' => 'SAMEORIGIN',
+                // Add specific headers for video playback
+                'Connection' => 'keep-alive',
+                'X-Accel-Buffering' => 'no',  // Disable nginx buffering for streaming
             ]
         );
     }
@@ -431,19 +452,30 @@ class VideoUploadController extends Controller
      */
     private function detectVideoMimeType(string $filePath, ?string $storedMimeType): string
     {
-        // Try to detect MIME type from file extension
+        // Try to detect MIME type from file extension first (most reliable)
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
         
         $mimeMap = [
             'mp4' => 'video/mp4',
-            'mov' => 'video/quicktime',
+            'mov' => 'video/quicktime', 
             'avi' => 'video/x-msvideo',
             'webm' => 'video/webm',
-            'm4v' => 'video/x-m4v',
+            'm4v' => 'video/mp4',  // Treat m4v as mp4 for better browser support
+            '3gp' => 'video/3gpp',
+            'flv' => 'video/x-flv',
+            'wmv' => 'video/x-ms-wmv',
+            'mkv' => 'video/x-matroska'
         ];
         
-        // Use extension-based MIME type if available
+        \Log::info('MIME type detection:', [
+            'file_path' => $filePath,
+            'extension' => $extension,
+            'stored_mime' => $storedMimeType
+        ]);
+        
+        // Use extension-based MIME type if available (most reliable)
         if (isset($mimeMap[$extension])) {
+            \Log::info('Using extension-based MIME type:', ['mime_type' => $mimeMap[$extension]]);
             return $mimeMap[$extension];
         }
         
@@ -455,14 +487,19 @@ class VideoUploadController extends Controller
                 finfo_close($finfo);
                 
                 if ($detectedMime && str_starts_with($detectedMime, 'video/')) {
+                    \Log::info('Using finfo detected MIME type:', ['mime_type' => $detectedMime]);
                     return $detectedMime;
                 }
             }
         }
         
-        // Fallback to stored MIME type or default
-        return $storedMimeType && str_starts_with($storedMimeType, 'video/') 
-            ? $storedMimeType 
-            : 'video/mp4';
+        // Fallback - prefer video/mp4 as it has best browser support
+        $fallbackMime = 'video/mp4';
+        if ($storedMimeType && str_starts_with($storedMimeType, 'video/')) {
+            $fallbackMime = $storedMimeType;
+        }
+        
+        \Log::info('Using fallback MIME type:', ['mime_type' => $fallbackMime]);
+        return $fallbackMime;
     }
 }

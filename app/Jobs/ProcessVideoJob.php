@@ -146,7 +146,15 @@ class ProcessVideoJob implements ShouldQueue
             Storage::disk('local')->makeDirectory($outputDir);
         }
         
-        if (Storage::disk('local')->exists($this->video->original_path)) {
+        // Check if original file exists
+        $originalExists = Storage::disk('local')->exists($this->video->original_path);
+        Log::info("Original file check:", [
+            'path' => $this->video->original_path,
+            'exists' => $originalExists,
+            'full_path' => Storage::disk('local')->path($this->video->original_path)
+        ]);
+        
+        if ($originalExists) {
             $copyResult = Storage::disk('local')->copy($this->video->original_path, $newPath);
             Log::info("Video copy result for {$this->video->id}: " . ($copyResult ? 'success' : 'failed'));
             
@@ -154,7 +162,13 @@ class ProcessVideoJob implements ShouldQueue
                 throw new \Exception("Failed to copy video file from {$this->video->original_path} to {$newPath}");
             }
         } else {
-            Log::warning("Original video file not found at: {$this->video->original_path}");
+            // List files in directory for debugging
+            $tempFiles = Storage::disk('local')->files('temp-videos');
+            Log::warning("Original video file not found", [
+                'looking_for' => $this->video->original_path,
+                'full_path' => Storage::disk('local')->path($this->video->original_path),
+                'files_in_temp_videos' => $tempFiles
+            ]);
             throw new \Exception("Original video file not found at: {$this->video->original_path}");
         }
         
@@ -171,17 +185,22 @@ class ProcessVideoJob implements ShouldQueue
             'size' => filesize($copiedPath)
         ]);
         
-        // Update video record
+        // Update video record with correct paths for MP4 direct playback
+        // Since we're not creating HLS, don't set hls_path - leave it null
+        // The streaming logic will fallback to original_path for direct MP4 playback
         $this->video->update([
             'status' => 'ready',
-            'hls_path' => $newPath, // Store relative path (e.g., 'videos/uuid/file.mp4')
+            'hls_path' => null, // No HLS created - use direct MP4 playback
+            'processed_path' => $newPath, // Store the processed/copied file path
             'duration_seconds' => 0, // We can't determine duration without FFmpeg
             'metadata' => array_merge($this->video->metadata ?? [], [
                 'processed_at' => now()->toISOString(),
-                'processing_method' => 'direct_copy',
+                'processing_method' => 'direct_copy_mp4',
                 'ffmpeg_available' => false,
                 'copied_file_size' => filesize($copiedPath),
-                'copied_file_path' => $newPath  // Store relative path, not absolute
+                'copied_file_path' => $newPath,  // Store relative path, not absolute
+                'format' => 'mp4_direct', // Mark as direct MP4 playback
+                'is_hls' => false // Explicitly mark as not HLS
             ])
         ]);
     }

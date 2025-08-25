@@ -11,9 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('videos', function (Blueprint $table) {
-            \DB::statement("ALTER TABLE videos MODIFY COLUMN status ENUM('pending', 'processing', 'ready', 'failed', 'replaced') DEFAULT 'pending'");
-        });
+        // SQLite doesn't support MODIFY COLUMN with ENUM
+        // Skip this migration in development (SQLite) environment
+        if (config('database.default') === 'mysql') {
+            Schema::table('videos', function (Blueprint $table) {
+                \DB::statement("ALTER TABLE videos MODIFY COLUMN status ENUM('pending', 'processing', 'ready', 'failed', 'replaced') DEFAULT 'pending'");
+            });
+        }
     }
 
     /**
@@ -21,8 +25,12 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('videos', function (Blueprint $table) {
-            \DB::statement("ALTER TABLE videos MODIFY COLUMN status ENUM('pending', 'processing', 'ready', 'failed') DEFAULT 'pending'");
-        });
+        // SQLite doesn't support MODIFY COLUMN with ENUM
+        // Skip this migration in development (SQLite) environment
+        if (config('database.default') === 'mysql') {
+            Schema::table('videos', function (Blueprint $table) {
+                \DB::statement("ALTER TABLE videos MODIFY COLUMN status ENUM('pending', 'processing', 'ready', 'failed') DEFAULT 'pending'");
+            });
+        }
     }
 };
